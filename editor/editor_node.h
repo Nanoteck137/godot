@@ -343,6 +343,7 @@ private:
 	Button *stop_button = nullptr;
 	Button *play_scene_button = nullptr;
 	Button *play_custom_scene_button = nullptr;
+	Button *steamdeck_deploy_button = nullptr;
 	PanelContainer *write_movie_panel = nullptr;
 	Button *write_movie_button = nullptr;
 
@@ -531,6 +532,8 @@ private:
 	void _menu_option(int p_option);
 	void _menu_confirm_current();
 	void _menu_option_confirm(int p_option, bool p_confirmed);
+
+    void _deploy_steamdeck();
 
 	void _android_build_source_selected(const String &p_file);
 

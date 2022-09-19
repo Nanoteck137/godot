@@ -804,6 +804,7 @@ void EditorNode::_notification(int p_what) {
 			play_custom_scene_button->set_icon(gui_base->get_theme_icon(SNAME("PlayCustom"), SNAME("EditorIcons")));
 			pause_button->set_icon(gui_base->get_theme_icon(SNAME("Pause"), SNAME("EditorIcons")));
 			stop_button->set_icon(gui_base->get_theme_icon(SNAME("Stop"), SNAME("EditorIcons")));
+			steamdeck_deploy_button->set_icon(gui_base->get_theme_icon(SNAME("Steamdeck"), SNAME("EditorIcons")));
 
 			prev_scene->set_icon(gui_base->get_theme_icon(SNAME("PrevScene"), SNAME("EditorIcons")));
 			distraction_free->set_icon(gui_base->get_theme_icon(SNAME("DistractionFree"), SNAME("EditorIcons")));
@@ -1364,6 +1365,50 @@ void EditorNode::_menu_option(int p_option) {
 
 void EditorNode::_menu_confirm_current() {
 	_menu_option_confirm(current_menu_option, true);
+}
+
+void EditorNode::_deploy_steamdeck() {
+	bool autosave = EDITOR_GET("run/auto_save/save_before_running");
+	if (autosave) {
+		_menu_option_confirm(FILE_SAVE_ALL_SCENES, false);
+	}
+
+    bool p_debug = false;
+	for (int i = 0; i < EditorExport::get_singleton()->get_export_preset_count(); i++) {
+		Ref<EditorExportPreset> preset = EditorExport::get_singleton()->get_export_preset(i);
+		ERR_FAIL_COND(preset.is_null());
+		Ref<EditorExportPlatform> platform = preset->get_platform();
+		ERR_FAIL_COND(platform.is_null());
+
+		platform->clear_messages();
+		Error err = platform->export_project(preset, p_debug, preset->get_export_path(), 0);
+		if (err == ERR_SKIP) {
+			return;
+		}
+
+		int count = platform->get_message_count();
+		for(int j = 0; j < count; j++) {
+			EditorExportPlatform::ExportMessage message = platform->get_message(j);
+			print_line(message.text);
+		}
+	}
+
+	String game_id = GLOBAL_GET("application/config/name");
+	String export_path = ProjectSettings::get_singleton()->get_resource_path() + "/export";
+
+	List<String> args;
+	args.push_back("deploy");
+	args.push_back(game_id);
+	args.push_back("linux.x86_64");
+	args.push_back(export_path);
+
+	int exitcode;
+	Error err = OS::get_singleton()->execute("decker", args, nullptr, &exitcode);
+	if(err != OK || exitcode != 0) {
+		print_line("Failed to execute decker");
+	} else {
+		OS::get_singleton()->alert("Success");
+	}
 }
 
 void EditorNode::_dialog_display_save_error(String p_file, Error p_error) {
@@ -6937,6 +6982,15 @@ EditorNode::EditorNode() {
 	play_custom_scene_button->set_toggle_mode(true);
 	play_custom_scene_button->set_focus_mode(Control::FOCUS_NONE);
 	play_custom_scene_button->connect("pressed", callable_mp(this, &EditorNode::_menu_option).bind(RUN_PLAY_CUSTOM_SCENE));
+
+	steamdeck_deploy_button = memnew(Button);
+	steamdeck_deploy_button->set_flat(true);
+	launch_pad_hb->add_child(steamdeck_deploy_button);
+	steamdeck_deploy_button->set_pressed(false);
+	steamdeck_deploy_button->set_icon(gui_base->get_theme_icon(SNAME("Steamdeck"), SNAME("EditorIcons")));
+	steamdeck_deploy_button->set_focus_mode(Control::FOCUS_NONE);
+	steamdeck_deploy_button->set_tooltip_text(TTR("Deploy to Steamdeck"));
+	steamdeck_deploy_button->connect("pressed", callable_mp(this, &EditorNode::_deploy_steamdeck));
 
 	_reset_play_buttons();
 
