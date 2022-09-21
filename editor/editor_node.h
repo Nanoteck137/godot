@@ -223,6 +223,8 @@ private:
 		GLOBAL_NEW_WINDOW,
 		GLOBAL_SCENE,
 
+		DEPLOY_TO_STEAMDECK,
+
 		IMPORT_PLUGIN_BASE = 100,
 
 		TOOL_MENU_BASE = 1000
@@ -346,6 +348,10 @@ private:
 	Button *steamdeck_deploy_button = nullptr;
 	PanelContainer *write_movie_panel = nullptr;
 	Button *write_movie_button = nullptr;
+
+	ConfirmationDialog *steamdeck_settings = nullptr;
+	LineEdit *steamdeck_settings_devkit_address = nullptr;
+	CheckBox *steamdeck_settings_debug_mode = nullptr;
 
 	Timer *screenshot_timer = nullptr;
 

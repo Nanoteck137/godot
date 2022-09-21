@@ -1368,47 +1368,10 @@ void EditorNode::_menu_confirm_current() {
 }
 
 void EditorNode::_deploy_steamdeck() {
-	bool autosave = EDITOR_GET("run/auto_save/save_before_running");
-	if (autosave) {
-		_menu_option_confirm(FILE_SAVE_ALL_SCENES, false);
-	}
+	// steamdeck_settings->popup_centered(Size2(780, 500) * EDSCALE);
+	steamdeck_settings->popup_centered();
+	return;
 
-    bool p_debug = false;
-	for (int i = 0; i < EditorExport::get_singleton()->get_export_preset_count(); i++) {
-		Ref<EditorExportPreset> preset = EditorExport::get_singleton()->get_export_preset(i);
-		ERR_FAIL_COND(preset.is_null());
-		Ref<EditorExportPlatform> platform = preset->get_platform();
-		ERR_FAIL_COND(platform.is_null());
-
-		platform->clear_messages();
-		Error err = platform->export_project(preset, p_debug, preset->get_export_path(), 0);
-		if (err == ERR_SKIP) {
-			return;
-		}
-
-		int count = platform->get_message_count();
-		for(int j = 0; j < count; j++) {
-			EditorExportPlatform::ExportMessage message = platform->get_message(j);
-			print_line(message.text);
-		}
-	}
-
-	String game_id = GLOBAL_GET("application/config/name");
-	String export_path = ProjectSettings::get_singleton()->get_resource_path() + "/export";
-
-	List<String> args;
-	args.push_back("deploy");
-	args.push_back(game_id);
-	args.push_back("linux.x86_64");
-	args.push_back(export_path);
-
-	int exitcode;
-	Error err = OS::get_singleton()->execute("decker", args, nullptr, &exitcode);
-	if(err != OK || exitcode != 0) {
-		print_line("Failed to execute decker");
-	} else {
-		OS::get_singleton()->alert("Success");
-	}
 }
 
 void EditorNode::_dialog_display_save_error(String p_file, Error p_error) {
@@ -3131,6 +3094,52 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 
 			save_all_scenes();
 			restart_editor();
+		} break;
+		case DEPLOY_TO_STEAMDECK: {
+			bool autosave = EDITOR_GET("run/auto_save/save_before_running");
+			if (autosave) {
+				_menu_option_confirm(FILE_SAVE_ALL_SCENES, false);
+			}
+
+			bool p_debug = false;
+			for (int i = 0; i < EditorExport::get_singleton()->get_export_preset_count(); i++) {
+				Ref<EditorExportPreset> preset = EditorExport::get_singleton()->get_export_preset(i);
+				ERR_FAIL_COND(preset.is_null());
+				Ref<EditorExportPlatform> platform = preset->get_platform();
+				ERR_FAIL_COND(platform.is_null());
+
+				platform->clear_messages();
+				Error err = platform->export_project(preset, p_debug, preset->get_export_path(), 0);
+				if (err == ERR_SKIP) {
+					return;
+				}
+
+				int count = platform->get_message_count();
+				for(int j = 0; j < count; j++) {
+					EditorExportPlatform::ExportMessage message = platform->get_message(j);
+					print_line(message.text);
+				}
+			}
+
+			String devkit_addr = steamdeck_settings_devkit_address->get_text();
+			String game_id = GLOBAL_GET("application/config/name");
+			String export_path = ProjectSettings::get_singleton()->get_resource_path() + "/export";
+
+			List<String> args;
+			args.push_back("-d");
+			args.push_back(devkit_addr);
+			args.push_back("deploy");
+			args.push_back(game_id);
+			args.push_back("linux.x86_64");
+			args.push_back(export_path);
+
+			int exitcode;
+			Error err = OS::get_singleton()->execute("decker", args, nullptr, &exitcode);
+			if(err != OK || exitcode != 0) {
+				print_line("Failed to execute decker");
+			} else {
+				OS::get_singleton()->alert("Success");
+			}
 		} break;
 	}
 }
@@ -6921,6 +6930,13 @@ EditorNode::EditorNode() {
 	launch_pad->add_theme_style_override("panel", gui_base->get_theme_stylebox(SNAME("LaunchPadNormal"), SNAME("EditorStyles")));
 	menu_hb->add_child(launch_pad);
 
+	Ref<StyleBox> box = gui_base->get_theme_stylebox(SNAME("LaunchPadNormal"), SNAME("EditorStyles"));
+	print_line(box);
+	print_line(box->get_margin(SIDE_LEFT));
+	print_line(box->get_margin(SIDE_RIGHT));
+	print_line(box->get_margin(SIDE_TOP));
+	print_line(box->get_margin(SIDE_BOTTOM));
+
 	HBoxContainer *launch_pad_hb = memnew(HBoxContainer);
 	launch_pad->add_child(launch_pad_hb);
 
@@ -6991,6 +7007,27 @@ EditorNode::EditorNode() {
 	steamdeck_deploy_button->set_focus_mode(Control::FOCUS_NONE);
 	steamdeck_deploy_button->set_tooltip_text(TTR("Deploy to Steamdeck"));
 	steamdeck_deploy_button->connect("pressed", callable_mp(this, &EditorNode::_deploy_steamdeck));
+
+	steamdeck_settings = memnew(ConfirmationDialog); 
+	steamdeck_settings->set_title(TTR("Deploy"));
+	steamdeck_settings->set_ok_button_text(TTR("Deploy"));
+	steamdeck_settings->connect("confirmed", callable_mp(this, &EditorNode::_menu_option).bind(DEPLOY_TO_STEAMDECK));
+	gui_base->add_child(steamdeck_settings);
+	{
+		GridContainer *container = memnew(GridContainer);
+		container->set_columns(2);
+		steamdeck_settings->add_child(container);
+
+		steamdeck_settings_devkit_address = memnew(LineEdit);
+		steamdeck_settings_devkit_address->set_h_size_flags(Control::SIZE_EXPAND_FILL);
+		steamdeck_settings_devkit_address->set_custom_minimum_size(Size2(100, 30) * EDSCALE);
+		container->add_child(memnew(Label(TTR("Devkit Address:"))));
+		container->add_child(steamdeck_settings_devkit_address);
+
+		steamdeck_settings_debug_mode = memnew(CheckBox);
+		container->add_child(memnew(Label(TTR("Debug Build:"))));
+		container->add_child(steamdeck_settings_debug_mode);
+	}
 
 	_reset_play_buttons();
 
